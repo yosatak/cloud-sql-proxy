@@ -26,7 +26,7 @@ PRE_PULL=true
 CONTAINER_NETWORK=cloudbuild
 
 OPTIND=1
-while getopts ":e:i:n:s:t:xPr:" opt; do
+while getopts ":e:i:n:s:S:t:xPr:" opt; do
   case $opt in
     e)
       ENV_PARAMS+=(-e "$OPTARG")
@@ -39,6 +39,9 @@ while getopts ":e:i:n:s:t:xPr:" opt; do
       ;;
     s)
       SQL_INSTANCES+=("$OPTARG")
+      ;;
+    S)
+      SQL_AUTO_IAM_AUTHN_INSTANCE=("$OPTARG")
       ;;
     t)
       SQL_TIMEOUT=$OPTARG
@@ -88,11 +91,14 @@ if [ -n "$PRE_PULL" ]; then
 fi
 
 SQL_INSTANCES=$(IFS=,; echo "${SQL_INSTANCES[*]}")
+if [ -n "${SQL_AUTO_IAM_AUTHN_INSTANCE}" ]; then
+  SQL_AUTO_IAM_AUTHN="--auto-iam-authn \"${SQL_AUTO_IAM_AUTHN_INSTANCE}\""
+fi
 if [ -n "${SQL_INSTANCES}" ]; then
   echo
   echo "---------- CONNECT CLOUDSQL ----------"
   touch cloud_sql_proxy.log
-  /buildstep/cloud_sql_proxy -dir=/cloudsql -instances=${SQL_INSTANCES} > cloud_sql_proxy.log 2>&1 &
+  /buildstep/cloud_sql_proxy -dir=/cloudsql ${SQL_AUTO_IAM_AUTHN} -instances=${SQL_INSTANCES} > cloud_sql_proxy.log 2>&1 &
   if (timeout ${SQL_TIMEOUT}s tail -f --lines=+1 cloud_sql_proxy.log &) | grep -qe 'Ready for new connections'; then
     echo "cloud_sql_proxy is running."
     echo "Connections: ${SQL_INSTANCES}."
